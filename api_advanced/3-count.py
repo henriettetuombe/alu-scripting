@@ -1,5 +1,6 @@
 #!/usr/bin/python3
-""" 3-count.py """
+""" parses the title of all hot articles,
+and prints a sorted count of given keywords """
 import json
 import requests
 
