@@ -1,44 +1,50 @@
 #!/usr/bin/python3
-"""parses the title of all hot articles"""
-import json
+""""3-count.py"""
 import requests
 
 
-def count_words(subreddit, word_list, after='', hot_list=None):
-    if hot_list is None:
-        hot_list = [0] * len(word_list)
+def count_words(subreddit, word_list, after="", words_count={}):
+    """"count words"""
+    url = "https://www.reddit.com/r/{}/hot.json?limit=100" \
+        .format(subreddit)
+    header = {'User-Agent': 'Mozilla/5.0'}
+    param = {'after': after}
+    response = requests.get(url, headers=header, params=param)
 
-    url = "https://www.reddit.com/r/{}/hot.json".format(subreddit)
-    request = requests.get(url, params={'after': after},
-                           allow_redirects=False,
-                           headers={'User-Agent': 'My User Agent 1.0'})
+    if response.status_code != 200:
+        return
 
-    if request.status_code == 200:
-        data = request.json()
+    json_res = response.json()
+    after = json_res.get('data').get('after')
+    has_next = after is not None
+    hot_titles = []
+    words = [word.lower() for word in word_list]
 
-        for topic in data['data']['children']:
-            title_words = topic['data']['title'].split()
-            for word in title_words:
-                for i, keyword in enumerate(word_list):
-                    if keyword.lower() == word.lower():
-                        hot_list[i] += 1
+    if len(words_count) == 0:
+        words_count = {word: 0 for word in words}
 
-        after = data['data']['after']
-        if after is None:
-            word_counts = {}
-            for i, word in enumerate(word_list):
-                if word not in word_counts:
-                    word_counts[word] = hot_list[i]
-                else:
-                    word_counts[word] += hot_list[i]
+    hot_articles = json_res.get('data').get('children')
+    [hot_titles.append(article.get('data').get('title'))
+     for article in hot_articles]
 
-            sorted_counts = sorted(
-                word_counts.items(),
-                key=lambda x: (-x[1], x[0].lower())
-            )
+    # loop through all titles
+    for i in range(len(hot_titles)):
+        for title_word in hot_titles[i].lower().split():
+            for word in words:
+                if word.lower() == title_word:
+                    words_count[word] = words_count.get(word) + 1
 
-            for word, count in sorted_counts:
-                if count > 0:
-                    print("{}: {}".format(word.lower(), count))
-        else:
-            count_words(subreddit, word_list, after, hot_list)
+    if has_next:
+        return count_words(subreddit, word_list, after, words_count)
+    else:
+
+        words_count = dict(filter(lambda item: item[1] != 0,
+                                  words_count.items()))
+
+        words_count = sorted(words_count.items(),
+                             key=lambda item: item[1],
+                             reverse=True)
+
+        for i in range(len(words_count)):
+            print("{}: {}".format(words_count[i][0],
+                                  words_count[i][1]))
